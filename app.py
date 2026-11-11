@@ -1,6 +1,8 @@
 
 import streamlit as st
 import pandas as pd
+import importlib
+import local_scrapers
 
 from jobspy import scrape_jobs
 from io import BytesIO
@@ -63,7 +65,11 @@ PLATFORMS = {
     "Google Jobs": "google",
     "Glassdoor": "glassdoor",
     "ZipRecruiter": "zip_recruiter",
-    "Bayt": "bayt"
+    "Bayt": "bayt",
+    "Emploi.ma": "emploi_ma",
+    "MarocAnnonces": "marocannonces",
+    "ReKrute.com": "rekrute",
+    "MarocEmploi.net": "marocemploi",
 }
 
 COLUMNS = [
@@ -450,6 +456,9 @@ with st.sidebar:
 # =====================================================
 
 if search:
+    # Streamlit reruns this script while imported modules remain cached.
+    # Refresh local source definitions before dispatching a new search.
+    local_scrapers = importlib.reload(local_scrapers)
 
     if not keywords:
         st.warning("Please enter at least one keyword.")
@@ -463,6 +472,7 @@ if search:
     else:
         results = []
         errors = []
+        blocked_local_sources = set()
 
         total = (
             len(keywords)
@@ -481,6 +491,11 @@ if search:
 
                     platform = PLATFORMS[platform_name]
 
+                    if platform in blocked_local_sources:
+                        completed += 1
+                        progress.progress(completed / total)
+                        continue
+
                     status.info(
                         f"Searching '{keyword}' "
                         f"on {platform_name} "
@@ -488,18 +503,27 @@ if search:
                     )
 
                     try:
-                        params = {
-                            "site_name": [platform],
-                            "search_term": keyword,
-                            "location": f"{city}, Morocco",
-                            "country_indeed": "Morocco",
-                            "results_wanted": int(limit)
-                        }
+                        if platform in local_scrapers.LOCAL_SOURCES:
+                            jobs = local_scrapers.scrape_local_jobs(
+                                source=platform,
+                                keyword=keyword,
+                                city=city,
+                                results_wanted=int(limit),
+                                hours_old=hours_old,
+                            )
+                        else:
+                            params = {
+                                "site_name": [platform],
+                                "search_term": keyword,
+                                "location": f"{city}, Morocco",
+                                "country_indeed": "Morocco",
+                                "results_wanted": int(limit)
+                            }
 
-                        if hours_old is not None:
-                            params["hours_old"] = hours_old
+                            if hours_old is not None:
+                                params["hours_old"] = hours_old
 
-                        jobs = scrape_jobs(**params)
+                            jobs = scrape_jobs(**params)
 
                         if not jobs.empty:
                             jobs = jobs.copy()
@@ -510,10 +534,34 @@ if search:
                             results.append(jobs)
 
                     except Exception as error:
-                        errors.append(
-                            f"{platform_name} / {city} / "
-                            f"{keyword}: {str(error)}"
+                        status_code = getattr(
+                            getattr(error, "response", None),
+                            "status_code",
+                            None,
                         )
+                        if (
+                            platform in local_scrapers.LOCAL_SOURCES
+                            and status_code in (403, 429)
+                        ):
+                            blocked_local_sources.add(platform)
+                            if platform == "emploi_ma" and status_code == 403:
+                                errors.append(
+                                    "Emploi.ma requires browser verification "
+                                    "(HTTP 403). Search directly at "
+                                    "https://www.emploi.ma/recherche-jobs-maroc. "
+                                    "Remaining Emploi.ma searches were skipped."
+                                )
+                            else:
+                                errors.append(
+                                    f"{platform_name}: HTTP {status_code} "
+                                    "from the site. Remaining searches on "
+                                    "this platform were skipped."
+                                )
+                        else:
+                            errors.append(
+                                f"{platform_name} / {city} / "
+                                f"{keyword}: {str(error)}"
+                            )
 
                     completed += 1
                     progress.progress(completed / total)

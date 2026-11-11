@@ -8,7 +8,7 @@ Search jobs by keywords, cities, platforms, and publication date. View the resul
 
 - 🔎 Search jobs using multiple keywords.
 - 📍 Search across multiple Moroccan cities.
-- 🌐 Select multiple job platforms, including Indeed, LinkedIn, Google Jobs, and other JobSpy-supported sources.
+- 🌐 Select job platforms including Indeed, LinkedIn, Google Jobs, Emploi.ma, MarocAnnonces, ReKrute.com, and MarocEmploi.net.
 - 📅 Filter jobs by publication date.
 - ⬇️ Sort job offers from newest to oldest.
 - 🗂️ Automatically remove duplicate job offers.
@@ -22,7 +22,8 @@ Search jobs by keywords, cities, platforms, and publication date. View the resul
 |---|---|
 | Python | Main programming language |
 | Streamlit | Web application interface |
-| JobSpy | Job listing collection |
+| JobSpy | Job listing collection for supported platforms |
+| Requests + Beautiful Soup | Public job listing collection for Moroccan job boards not supported by JobSpy |
 | Pandas | Data processing and filtering |
 | OpenPyXL | Excel generation and formatting |
 
@@ -121,6 +122,7 @@ http://localhost:8501
 ```text
 Jobfinder/
 ├── app.py
+├── local_scrapers.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
@@ -149,6 +151,8 @@ Excel files include formatted headers, sortable tables, filters, and clickable a
 
 - Job availability depends on the selected platform and location.
 - Some platforms restrict automated scraping. Use JobSpy only where the collection method is authorized.
+- Emploi.ma, MarocAnnonces, ReKrute.com, and MarocEmploi.net are queried from their public job listings. Their page layouts and access rules can change, so results may be unavailable temporarily.
+- Emploi.ma currently serves browser verification to automated requests, so its listings may need to be searched directly on the site.
 - Publication dates may not include exact posting times.
 - Search results may contain incomplete information.
 - Avoid excessive automated requests to recruitment websites.
